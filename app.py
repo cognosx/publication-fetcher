@@ -51,7 +51,7 @@ def build_publications_dataframe(orcid_id):
 
         # Extracting authors
         authors_list = metadata.get('author', [])
-        authors_name = f"{author.get('given')} {author.get('family')}" for author in authors_list  if 'given' in author and 'family' in author
+        authors_name = [f"{author.get('given')} {author.get('family')}" for author in authors_list  if 'given' in author and 'family' in author]
         authors_list = metadata.get('author', [])
         authors_orcid_url = [{'name': f"{author.get('given')} {author.get('family')}", 'ORCID': author.get('ORCID')} for author in authors_list  if 'given' in author and 'family' in author]
         authors_orcid_id = [{'name': f"{author.get('given')} {author.get('family')}", 'ORCID': author.get('ORCID').replace("http://orcid.org/", "") if author.get('ORCID') else None} for author in authors_list  if 'given' in author and 'family' in author]
