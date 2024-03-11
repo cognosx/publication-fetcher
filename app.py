@@ -74,7 +74,7 @@ def build_publications_dataframe(orcid_id):
             #'Published Date': metadata.get('published', {}).get('date-parts', [[None]]),
             'Published Year': metadata.get('published', {}).get('date-parts', [[None]])[0][0],
             #'Journal Abbr': metadata.get('short-container-title', []),
-            'Journal': metadata.get('container-title', ['']),
+            'Journal': metadata.get('container-title', []),
             #'Journal Original': metadata.get('original-title', ['']),
             
 
@@ -84,12 +84,12 @@ def build_publications_dataframe(orcid_id):
             #'ISSN': ', '.join(metadata.get('ISSN')),
             'Publisher': metadata.get('publisher'),
             'Publication Type': metadata.get('type'),
-            'Language': metadata.get('language', ['']),
+            #'Language': metadata.get('language', []),
 
-            'Subject': metadata.get('subject', ['Unknown']),
+            'Subject': metadata.get('subject', []),
             'Funders': metadata.get('funder'),
             'Citation count': metadata.get('is-referenced-by-count'),
-            'Source': metadata.get('source'), 
+            #'Source': metadata.get('source'), 
 
             #'Abstract Altmetric': altmetric_data.get('abstract'),
             #'Authors Altmetric': altmetric_data.get('authors'),
