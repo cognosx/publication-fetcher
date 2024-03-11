@@ -51,7 +51,7 @@ def build_publications_dataframe(orcid_id):
 
         # Extracting authors
         authors_list = metadata.get('author', [])
-        authors_name = [f"{author.get('given')} {author.get('family')}" for author in authors_list  if 'given' in author and 'family' in author]
+        authors_name = f"{author.get('given')} {author.get('family')}" for author in authors_list  if 'given' in author and 'family' in author
         authors_list = metadata.get('author', [])
         authors_orcid_url = [{'name': f"{author.get('given')} {author.get('family')}", 'ORCID': author.get('ORCID')} for author in authors_list  if 'given' in author and 'family' in author]
         authors_orcid_id = [{'name': f"{author.get('given')} {author.get('family')}", 'ORCID': author.get('ORCID').replace("http://orcid.org/", "") if author.get('ORCID') else None} for author in authors_list  if 'given' in author and 'family' in author]
@@ -61,7 +61,7 @@ def build_publications_dataframe(orcid_id):
         publication_info = {
             'DOI': doi,
             #'URL': metadata.get('URL'),
-            'Title': metadata.get('title', []),
+            'Title': metadata.get('title'),
             #'Abstract': metadata.get('abstract', []),
             #'Authors_brut': metadata.get('author', []),
             #'Authors Orcid Url': authors_orcid_url,
@@ -74,7 +74,7 @@ def build_publications_dataframe(orcid_id):
             #'Published Date': metadata.get('published', {}).get('date-parts', [[None]]),
             'Published Year': metadata.get('published', {}).get('date-parts', [[None]])[0][0],
             #'Journal Abbr': metadata.get('short-container-title', []),
-            'Journal': metadata.get('container-title', []),
+            'Journal': metadata.get('container-title'),
             #'Journal Original': metadata.get('original-title', ['']),
             
 
@@ -86,7 +86,7 @@ def build_publications_dataframe(orcid_id):
             'Publication Type': metadata.get('type'),
             #'Language': metadata.get('language', []),
 
-            'Subject': metadata.get('subject', []),
+            'Subject': metadata.get('subject'),
             'Funders': metadata.get('funder'),
             'Citation count': metadata.get('is-referenced-by-count'),
             #'Source': metadata.get('source'), 
