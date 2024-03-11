@@ -70,20 +70,21 @@ def build_publications_dataframe(orcid_id):
            
             #'Authors': ', '.join([author['given'] for author in metadata.get('authors', []) if 'given' in author]),
             #'Created Date': metadata.get('created', {}).get('date-parts', [[None]]),
-            'Created Year': metadata.get('created', {}).get('date-parts', [[None]])[0][0],
+            #'Created Year': metadata.get('created', {}).get('date-parts', [[None]])[0][0],
             #'Published Date': metadata.get('published', {}).get('date-parts', [[None]]),
             'Published Year': metadata.get('published', {}).get('date-parts', [[None]])[0][0],
-            'Journal Abbr': metadata.get('short-container-title', []),
+            #'Journal Abbr': metadata.get('short-container-title', []),
             'Journal': metadata.get('container-title', ['']),
             #'Journal Original': metadata.get('original-title', ['']),
-            'Language': metadata.get('language', ['']),
+            
 
-            'Volume': metadata.get('volume'),
-            'Issue': metadata.get('issue'),
-            'Pages': metadata.get('page'),
+            #'Volume': metadata.get('volume'),
+            #'Issue': metadata.get('issue'),
+            #'Pages': metadata.get('page'),
             #'ISSN': ', '.join(metadata.get('ISSN')),
             'Publisher': metadata.get('publisher'),
             'Publication Type': metadata.get('type'),
+            'Language': metadata.get('language', ['']),
 
             'Subject': metadata.get('subject', ['Unknown']),
             'Funders': metadata.get('funder'),
