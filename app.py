@@ -8,27 +8,30 @@ from dash.exceptions import PreventUpdate
 from flask_caching import Cache
 import dash_bootstrap_components as dbc
 import re
-from dash import no_update  # Import no_update for cases where no update is required 
+# from dash import no_update  # Import no_update for cases where no update is required 
+
+from dash import dcc, html, dash_table, callback_context, Input, Output, State, no_update
 
 # Initialize the Dash app with Bootstrap and server-side caching
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 cache = Cache(app.server, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'cache-directory'})
 
+# Define the layout of the app
 app.layout = dbc.Container([
-    dbc.Row(dbc.Col(html.H1('ORCID Publications Fetcher'))),
-    dbc.Row(dbc.Col(html.P("Enter your ORCID ID to fetch and display your publications."))),
-    dbc.Row(dbc.Col(dcc.Input(
-        id='orcid-input', type='text', placeholder='e.g., 0000-0002-1825-0097', 
-        debounce=True, className="mb-3"
-    ))),
-    dbc.Row(dbc.Col(html.Button('Submit', id='submit-button', n_clicks=0, className="mb-3"))),
+    dbc.Row(dbc.Col(html.H1('ORCID Publications Fetcher'), width={"size": 6, "offset": 3}, className="text-center")),
+    dbc.Row(dbc.Col(html.P("Enter your ORCID ID to fetch and display your publications."), className="mb-3 text-center")),
+    dbc.Row([
+        dbc.Col(dcc.Input(id='orcid-input', type='text', placeholder='e.g., 0000-0002-1825-0097', debounce=True), width=10),
+        dbc.Col(html.Button('Submit', id='submit-button', n_clicks=0, className="btn-primary"), width=2),
+    ], justify="center"),
+    dbc.Row(dbc.Col(dbc.Alert(id='input-alert', color="warning", className="mt-3", style={"display": "none"}))),
     dbc.Row(dbc.Col(html.Div(id='spinner-container', children=[dbc.Spinner(size="lg", color="primary", type="border")], style={'display': 'none'}))),
-    # dbc.Row(dbc.Col(dbc.Spinner(id='loading-spinner', children=[], size="lg", color="primary", type="border", fullscreen=False, style={'display': 'none'}))),
-    dbc.Row(dbc.Col(html.Button('Download Publications List', id='download-button', disabled=True))),
+    dbc.Row(dbc.Col(html.Button('Download Publications List', id='download-button', disabled=True, className="mt-3"))),
     dcc.Download(id='download-link'),
     dcc.Store(id='stored-data'),
-    html.Div(id='table-container')  # Placeholder for potential additional content
-], fluid=True)
+    html.Div(id='table-container', className="mt-3")  # Placeholder for table
+], fluid=True, className="py-3")
+
 
 
 @cache.memoize()
@@ -180,6 +183,8 @@ def download_publications_list(n_clicks, stored_data, orcid_id):
     # spinner_style = {'display': 'none'}  # Hide spinner
     # Return the CSV download, dynamically naming the file with the ORCID ID
     return dcc.send_data_frame(df.to_csv, filename, index=False)
+
+
 
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
