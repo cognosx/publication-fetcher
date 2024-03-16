@@ -1,185 +1,184 @@
-# Import necessary libraries
-import os  
 import dash
-from dash import dcc, html
-from dash.dependencies import Input, Output, State
-from dash.exceptions import PreventUpdate
 import pandas as pd
 import requests
-import json
+from dash import dcc, html, dash_table, callback_context
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
+from flask_caching import Cache
+import dash_bootstrap_components as dbc
+import re
+from dash import no_update  # Import no_update for cases where no update is required 
 
-# Function to fetch publications from ORCID
+# Initialize the Dash app with Bootstrap and server-side caching
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+cache = Cache(app.server, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'cache-directory'})
+
+app.layout = dbc.Container([
+    dbc.Row(dbc.Col(html.H1('ORCID Publications Fetcher'))),
+    dbc.Row(dbc.Col(html.P("Enter your ORCID ID to fetch and display your publications."))),
+    dbc.Row(dbc.Col(dcc.Input(
+        id='orcid-input', type='text', placeholder='e.g., 0000-0002-1825-0097', 
+        debounce=True, className="mb-3"
+    ))),
+    dbc.Row(dbc.Col(html.Button('Submit', id='submit-button', n_clicks=0, className="mb-3"))),
+    dbc.Row(dbc.Col(html.Div(id='spinner-container', children=[dbc.Spinner(size="lg", color="primary", type="border")], style={'display': 'none'}))),
+    # dbc.Row(dbc.Col(dbc.Spinner(id='loading-spinner', children=[], size="lg", color="primary", type="border", fullscreen=False, style={'display': 'none'}))),
+    dbc.Row(dbc.Col(html.Button('Download Publications List', id='download-button', disabled=True))),
+    dcc.Download(id='download-link'),
+    dcc.Store(id='stored-data'),
+    html.Div(id='table-container')  # Placeholder for potential additional content
+], fluid=True)
+
+
+@cache.memoize()
 def fetch_orcid_publications(orcid_id):
     url = f'https://pub.orcid.org/v3.0/{orcid_id}/works'
     headers = {'Accept': 'application/json'}
-    response = requests.get(url, headers=headers)
-    dois = []
-    if response.status_code == 200:
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raises HTTPError for bad responses
         works = response.json().get('group', [])
-        for work in works:
-            for external_id in work['work-summary'][0]['external-ids']['external-id']:
-                if external_id['external-id-type'] == 'doi':
-                    dois.append(external_id['external-id-value'])
-    return dois
+        dois = [
+            external_id['external-id-value']
+            for work in works
+            for external_id in work['work-summary'][0]['external-ids']['external-id']
+            if external_id['external-id-type'] == 'doi'
+        ]
+        return dois
+    except requests.RequestException as e:
+        print(f"Error fetching ORCID publications: {e}")
+        return []
 
-# Function to fetch metadata from Crossref
+@cache.memoize()
 def fetch_crossref_metadata(doi):
     url = f'https://api.crossref.org/works/{doi}'
-    response = requests.get(url)
-    if response.status_code == 200:
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
         return response.json().get('message', {})
-    return {}
+    except requests.RequestException as e:
+        print(f"Error fetching Crossref metadata: {e}")
+        return {}
 
-# Function to fetch Altmetric data (placeholder implementation)
+@cache.memoize()
 def fetch_altmetric_data(doi):
-    # This is a placeholder implementation. Adjust according to your access to Altmetric data.
     altmetric_url = f'https://api.altmetric.com/v1/doi/{doi}'
-    response = requests.get(altmetric_url)
-    if response.status_code == 200:
+    try:
+        response = requests.get(altmetric_url)
+        response.raise_for_status()
         return response.json()
-    return {}
+    except requests.RequestException as e:
+        print(f"Error fetching Altmetric data: {e}")
+        return {}
 
-# Function to build publications DataFrame
 def build_publications_dataframe(orcid_id):
     dois = fetch_orcid_publications(orcid_id)
-    publications_data = []
-
-    for doi in dois:
-        metadata = fetch_crossref_metadata(doi)
-        altmetric_data = fetch_altmetric_data(doi)  # Placeholder for fetching altmetric data
-        
-
-        # Extracting authors
-        authors_list = metadata.get('author', [])
-        authors_name = [f"{author.get('given')} {author.get('family')}" for author in authors_list  if 'given' in author and 'family' in author]
-        authors_list = metadata.get('author', [])
-        authors_orcid_url = [{'name': f"{author.get('given')} {author.get('family')}", 'ORCID': author.get('ORCID')} for author in authors_list  if 'given' in author and 'family' in author]
-        authors_orcid_id = [{'name': f"{author.get('given')} {author.get('family')}", 'ORCID': author.get('ORCID').replace("http://orcid.org/", "") if author.get('ORCID') else None} for author in authors_list  if 'given' in author and 'family' in author]
-
-
-        # Extracting simplified metadata for demonstration purposes
-        publication_info = {
-            'DOI': doi,
-            #'URL': metadata.get('URL'),
-            'Title': metadata.get('title'),
-            #'Abstract': metadata.get('abstract', []),
-            #'Authors_brut': metadata.get('author', []),
-            #'Authors Orcid Url': authors_orcid_url,
-            #'Authors Orcid Id': authors_orcid_id,
-            'Authors Name': authors_name,
-           
-            #'Authors': ', '.join([author['given'] for author in metadata.get('authors', []) if 'given' in author]),
-            #'Created Date': metadata.get('created', {}).get('date-parts', [[None]]),
-            #'Created Year': metadata.get('created', {}).get('date-parts', [[None]])[0][0],
-            #'Published Date': metadata.get('published', {}).get('date-parts', [[None]]),
-            'Published Year': metadata.get('published', {}).get('date-parts', [[None]])[0][0],
-            #'Journal Abbr': metadata.get('short-container-title', []),
-            'Journal': metadata.get('container-title'),
-            #'Journal Original': metadata.get('original-title', ['']),
-            
-
-            #'Volume': metadata.get('volume'),
-            #'Issue': metadata.get('issue'),
-            #'Pages': metadata.get('page'),
-            #'ISSN': ', '.join(metadata.get('ISSN')),
-            'Publisher': metadata.get('publisher'),
-            'Publication Type': metadata.get('type'),
-            #'Language': metadata.get('language', []),
-
-            'Subject': metadata.get('subject'),
-            'Funders': metadata.get('funder'),
-            'Citation count': metadata.get('is-referenced-by-count'),
-            #'Source': metadata.get('source'), 
-
-            #'Abstract Altmetric': altmetric_data.get('abstract'),
-            #'Authors Altmetric': altmetric_data.get('authors'),
-            #'Altmetric is_oa': altmetric_data.get('is_oa'),
-
-            'Altmetric Score': altmetric_data.get('score'),
-            'Altmetric Read Count': altmetric_data.get('readers_count'),
-            'Altmetric Image': altmetric_data.get('images', {}).get('small') if altmetric_data.get('images') else None,
-            'Altmetric URL': altmetric_data.get('details_url')
-        }
-
-        publications_data.append(publication_info)
-        
+    publications_data = [collect_publication_info(doi) for doi in dois]
     return pd.DataFrame(publications_data)
 
-# Initialize the Dash app
-app = dash.Dash(__name__)
+def collect_publication_info(doi):
+    metadata = fetch_crossref_metadata(doi)
+    altmetric_data = fetch_altmetric_data(doi)
+    authors_list = metadata.get('author', [])
+    authors_name = [f"{author.get('given')} {author.get('family')}" for author in authors_list if 'given' in author and 'family' in author]
+    return {
+        'DOI': doi,
+        'Title': metadata.get('title', [''])[0],
+        'Authors Name': ', '.join(authors_name),
+        'Published Year': metadata.get('published', {}).get('date-parts', [[None]])[0][0],
+        'Journal': ', '.join(metadata.get('container-title', [])),
+        'Publisher': metadata.get('publisher', ''),
+        'Publication Type': metadata.get('type', ''),
+        'Subject': ', '.join(metadata.get('subject', [])),
+        'Funders': ', '.join(funder.get('name', '') for funder in metadata.get('funder', [])),
+        'Citation count': metadata.get('is-referenced-by-count', 0),
+        'Altmetric Score': altmetric_data.get('score'),
+        'Altmetric Read Count': altmetric_data.get('readers_count'),
+        'Altmetric Image': altmetric_data.get('images', {}).get('small'),
+        'Altmetric URL': altmetric_data.get('details_url')
+    }
 
-# Define the app layout
-app.layout = html.Div([
-    html.H1("ORCID Publications Fetcher"),
-    dcc.Input(id='orcid-input', type='text', placeholder='Enter ORCID ID'),
-    html.Button('Submit', id='submit-button', n_clicks=0),
-    #html.Button('Download CSV', id='btn_csv'),
-    #dcc.Download(id='download-publications-csv'),
-    html.Div(id='container-button-basic'),
-    
-    dcc.Store(id='stored-data'),  # To store the DataFrame temporarily
-    html.Button('Download Publications List', id='download-button'),
-    dcc.Download(id='download-link')
-])
 
-# Define callback to update page
 @app.callback(
-    Output('container-button-basic', 'children'),
+    [
+        Output('table-container', 'children'),
+        Output('submit-button', 'disabled'),  # Disable the submit button to indicate processing
+        Output('spinner-container', 'style'),
+        Output('stored-data', 'data'),
+        Output('download-button', 'disabled')
+    ],
     [Input('submit-button', 'n_clicks')],
-    [dash.dependencies.State('orcid-input', 'value')]
+    [State('orcid-input', 'value')],
+    prevent_initial_call=True
 )
-def update_output(n_clicks, value):
-    if n_clicks > 0 and value:
-        df = build_publications_dataframe(value)
-        if not df.empty:
-            # Convert all DataFrame cells to strings, handling lists of dictionaries
-            df = df.applymap(lambda x: ', '.join([json.dumps(item) if isinstance(item, dict) else item for item in x]) if isinstance(x, list) else str(x))
-            
-            # Convert the DataFrame to a simple HTML table for display
-            return html.Table(
-                # Header
-                [html.Tr([html.Th(col) for col in df.columns])] +
-                # Body
-                [html.Tr([
-                    html.Td(df.iloc[i][col]) for col in df.columns
-                ]) for i in range(len(df))]
-            )
-        else:
-            return 'No publications found for this ORCID ID.'
-    return 'Enter an ORCID ID and click submit.'
+def update_table(n_clicks, orcid_id):
+    if not orcid_id:
+        return dbc.Alert("Please enter a valid ORCID ID.", color="warning"), False, {'display': 'none'}, no_update, True
 
-
-# Adjust your callback that generates the DataFrame to store it in dcc.Store
-@app.callback(
-    Output('stored-data', 'data'),  # Output to the dcc.Store component
-    Input('submit-button', 'n_clicks'),  # Triggered by the submit button click
-    State('orcid-input', 'value')  # Reads the value from the input without triggering the callback
-)
-def update_and_store_data(n_clicks, orcid_id):
-    if n_clicks is None or orcid_id is None:
-        raise dash.exceptions.PreventUpdate
-    # Call your function to build the DataFrame based on the ORCID ID
+    if not re.match(r'^\d{4}-\d{4}-\d{4}-[\dX]{4}$', orcid_id):
+        return dbc.Alert("Please enter a valid ORCID ID format (e.g., 0000-0002-1825-0097).", color="warning"), False, {'display': 'none'}, no_update, True
+    
+    # ORCID ID is valid, show the spinner while fetching data
+    spinner_style = {'display': 'block'}  # Make the spinner visible
+ 
     df = build_publications_dataframe(orcid_id)
-    # Convert DataFrame to a dictionary for dcc.Store
-    return df.to_dict('records')
+    if df.empty:
+        return dbc.Alert("No publications found for the provided ORCID ID.", color="warning"), False, {'display': 'none'}, no_update, True
 
+
+    # Generate tooltip data for each cell
+    tooltip_data = [
+        {column: {'value': str(value), 'type': 'markdown'} for column, value in row.items()}
+        for row in df.to_dict('records')
+    ]
+
+    # spinner_style = {'display': 'block'}  # Make the spinner visible
+    # Create the table with tooltips
+    table = dbc.Spinner(dash_table.DataTable(
+        id='table-filtering',
+        columns=[{"name": i, "id": i} for i in df.columns],
+        data=df.to_dict('records'),
+        filter_action='native',
+        sort_action='native',
+        sort_mode='multi',
+        page_size=10,
+        style_cell={'overflow': 'hidden', 'textOverflow': 'ellipsis', 'maxWidth': 200},
+        tooltip_data=tooltip_data,
+        tooltip_delay=0,
+        tooltip_duration=None
+    ), size="lg", color="primary", type="border", fullscreen=True)
+
+    # Once data fetching and processing are complete, hide the spinner again
+    spinner_style = {'display': 'none'}  # Hide spinner
+
+    # Enable the submit button again after processing
+    return table, False, spinner_style, df.to_dict('records'), False
+
+
+
+# Additional callback for download functionality would go here
+# Example: Download button callback to generate a CSV of the table data
 # Callback to download the data
 @app.callback(
     Output('download-link', 'data'),
-    Input('download-button', 'n_clicks'),
-    State('stored-data', 'data'),
+    [Input('download-button', 'n_clicks')],
+    [State('stored-data', 'data'),  # Keeps existing state for the data
+     State('orcid-input', 'value')],  # Adds the ORCID ID as a state
     prevent_initial_call=True
 )
-def download_publications_list(n_clicks, stored_data):
+def download_publications_list(n_clicks, stored_data, orcid_id):
     if n_clicks is None or stored_data is None:
         raise PreventUpdate
+    # Sanitize the ORCID ID to ensure it's safe for use in a filename
+    # This removes any characters that might be invalid for filenames
+    safe_orcid_id = re.sub(r'[^\w\-_]', '_', orcid_id)
+    filename = f"{safe_orcid_id}_publications_list.csv"
     # Convert the stored data back to a DataFrame
     df = pd.DataFrame(stored_data)
-    # Return the CSV download
-    return dcc.send_data_frame(df.to_csv, "publications_list.csv")
+    # Once data fetching and processing are complete, hide the spinner again
+    # spinner_style = {'display': 'none'}  # Hide spinner
+    # Return the CSV download, dynamically naming the file with the ORCID ID
+    return dcc.send_data_frame(df.to_csv, filename, index=False)
 
-
-
-# Run the app
 if __name__ == '__main__':
-    app.run_server(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+    app.run_server(debug=True)
