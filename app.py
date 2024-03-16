@@ -181,4 +181,4 @@ def download_publications_list(n_clicks, stored_data, orcid_id):
     return dcc.send_data_frame(df.to_csv, filename, index=False)
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True, host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
