@@ -2,15 +2,13 @@ import os
 import dash
 import pandas as pd
 import requests
-from dash import dcc, html, dash_table, callback_context
-from dash.dependencies import Input, Output, State
+from dash import dcc, html, dash_table, callback_context, Input, Output, State, no_update, callback
 from dash.exceptions import PreventUpdate
-from flask_caching import Cache
 import dash_bootstrap_components as dbc
 import re
-# from dash import no_update  # Import no_update for cases where no update is required 
+from flask_caching import Cache
+import time
 
-from dash import dcc, html, dash_table, callback_context, Input, Output, State, no_update
 
 # Initialize the Dash app with Bootstrap and server-side caching
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
@@ -18,21 +16,62 @@ cache = Cache(app.server, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'cach
 
 # Define the layout of the app
 app.layout = dbc.Container([
-    dbc.Row(dbc.Col(html.H1('ORCID Publications Fetcher'), width={"size": 6, "offset": 3}, className="text-center")),
-    dbc.Row(dbc.Col(html.P("Enter your ORCID ID to fetch and display your publications."), className="mb-3 text-center")),
-    dbc.Row([
-        dbc.Col(dcc.Input(id='orcid-input', type='text', placeholder='e.g., 0000-0002-1825-0097', debounce=True), width=10),
-        dbc.Col(html.Button('Submit', id='submit-button', n_clicks=0, className="btn-primary"), width=2),
-    ], justify="center"),
-    dbc.Row(dbc.Col(dbc.Alert(id='input-alert', color="warning", className="mt-3", style={"display": "none"}))),
-    dbc.Row(dbc.Col(html.Div(id='spinner-container', children=[dbc.Spinner(size="lg", color="primary", type="border")], style={'display': 'none'}))),
-    dbc.Row(dbc.Col(html.Button('Download Publications List', id='download-button', disabled=True, className="mt-3"))),
+    dbc.Row(dbc.Col(html.H1('Publications Fetcher'), 
+        width={"size": 6, "offset": 3}, 
+        className="d-flex justify-content-center")),
+    dbc.Row(dbc.Col(html.P("Enter your ORCID ID to fetch and display your publications."), 
+        className="d-flex justify-content-center")),
+    dbc.Row(
+        dbc.Col([
+            dcc.Input(id='orcid-input', type='text', placeholder='e.g., 0000-0002-1825-0097', debounce=True, className="me-2"),
+            html.Button('Submit', id='submit-button', n_clicks=0)
+        ], width=12, className="d-flex justify-content-center"),
+        justify="center"  # This centers the row
+    ),
+    dbc.Row(dbc.Col(dbc.Alert(id='input-alert', 
+        color="warning", 
+        className="mt-3", 
+        style={"display": "none"}))),
+    dbc.Row(dbc.Col(dbc.Alert(id='status-alert', 
+        children="The ORCID number is valid. Fetching publications, please wait...", 
+        # is_open=True, 
+        # disabled=True, 
+        color="info", 
+        className="mt-3", 
+        style={"display": "none"}))),
+    dbc.Row(dbc.Col(dbc.Alert(id='status-alert-output', 
+        children="Publications ready. You can now view or download the list.", 
+        # is_open=True, 
+        # disabled=True, 
+        color="info", 
+        className="mt-3", 
+        style={"display": "none"}))),
+
+    dbc.Row(dbc.Col(html.Div(id='spinner-container', 
+        children=[dbc.Spinner(size="lg", 
+        color="primary", type="border")], 
+        style={'display': 'none'}))),
+    dbc.Row(dbc.Col(html.Div(id='spinner-container-closed', 
+        children=[dbc.Spinner(size="lg", 
+        color="primary", type="border")], 
+        style={'display': 'none'}))),
+
+    dbc.Row(dbc.Col(html.Button('Download Publications List', 
+        id='download-button', 
+        disabled=True, 
+        className="mt-3",
+        style={'display': 'none'}))),
     dcc.Download(id='download-link'),
+
     dcc.Store(id='stored-data'),
+    dcc.Store(id='stored-orcid-id'),  # Add this
+
     html.Div(id='table-container', className="mt-3")  # Placeholder for table
 ], fluid=True, className="py-3")
 
 
+
+#############functions to fetch############################
 
 @cache.memoize()
 def fetch_orcid_publications(orcid_id):
@@ -103,65 +142,190 @@ def collect_publication_info(doi):
     }
 
 
+
+
+####################################################""abs
+# @app.callback(
+#     [
+#         Output('status-alert', 'children'),  # Alert message about the process
+#         Output('status-alert', 'style'),  # Style for the alert (visibility)
+#         Output('spinner-container', 'style'),  # Spinner visibility
+#         Output('stored-orcid-id', 'data'),  # Store the validated ORCID ID
+#         Output('table-container', 'children'),  # The table of publications
+#         Output('download-button', 'disabled'),  # Control the download button
+#         Output('download-button', 'style'),  # Style for the download button (visibility)
+#         Output('stored-data', 'data'),  # Store the fetched data
+#     ],
+#     [
+#         Input('submit-button', 'n_clicks'),
+#     ],
+#     [
+#         State('orcid-input', 'value'),
+#     ],
+#     prevent_initial_call=True
+# )
+# def validate_fetch_and_update_ui(n_clicks, orcid_id):
+#     if not orcid_id or not re.match(r'^\d{4}-\d{4}-\d{4}-[\dX]{4}$', orcid_id):
+#         # ORCID ID is invalid
+#         return (
+#             "Missing or Invalid ORCID ID format. Please correct it and try again.",
+#             {'display': 'block', 'color': 'warning'},
+#             {'display': 'none'},  # Hide spinner
+#             no_update,
+#             no_update,
+#             True,
+#             {'display': 'none'},
+#             no_update,
+#         )
+
+#     # ORCID ID is valid, update UI to show spinner and message
+#     # Fetch publications
+#     df = build_publications_dataframe(orcid_id)
+
+#     if df.empty:
+#         # No publications found or unable to fetch
+#         return (
+#             "Unable to fetch publications or no publications found for the provided ORCID ID.",
+#             {'display': 'block', 'color': 'secondary'},
+#             {'display': 'none'},  # Hide spinner after fetching
+#             orcid_id,
+#             no_update,
+#             True,
+#             {'display': 'none'},
+#             no_update,
+#         )
+
+#     # Publications fetched successfully
+#     tooltip_data = [
+#         {column: {'value': str(value), 'type': 'markdown'} for column, value in row.items()}
+#         for row in df.to_dict('records')
+#     ]
+#     table = dbc.Spinner(dash_table.DataTable(
+#         id='table-filtering',
+#         columns=[{"name": i, "id": i} for i in df.columns],
+#         data=df.to_dict('records'),
+#         filter_action='native',
+#         sort_action='native',
+#         sort_mode='multi',
+#         page_size=10,
+#         style_cell={'overflow': 'hidden', 'textOverflow': 'ellipsis', 'maxWidth': 200},
+#         tooltip_data=tooltip_data,
+#         tooltip_delay=0,
+#         tooltip_duration=None
+#     ), size="lg", color="primary", type="border", fullscreen=True)
+
+#     return (
+#         "Publications ready. You can now view or download the list.",
+#         {'display': 'block', 'color': 'success'},
+#         {'display': 'none'},  # Hide spinner
+#         orcid_id,
+#         table,
+#         False,  # Enable download button
+#         {'display': 'block'},  # Show download button
+#         df.to_dict('records'),
+#     )
+
+################################""""
+# from dash.exceptions import PreventUpdate
+
 @app.callback(
     [
-        Output('table-container', 'children'),
-        Output('submit-button', 'disabled'),  # Disable the submit button to indicate processing
-        Output('spinner-container', 'style'),
-        Output('stored-data', 'data'),
-        Output('download-button', 'disabled')
+        Output('status-alert', 'children'),  # To update the message
+        Output('status-alert', 'style'),  # To show/hide the message alert
+        Output('spinner-container', 'style'),  # To show/hide the spinner
+        Output('stored-orcid-id', 'data'),  # To store the ORCID ID if valid
+        Output('table-container', 'children'),  # To display the data table
+        Output('download-button', 'disabled'),  # To enable/disable the download button
+        Output('download-button', 'style'),  # To show/hide the download button
+        Output('stored-data', 'data'),  # To store the fetched data for download
     ],
     [Input('submit-button', 'n_clicks')],
     [State('orcid-input', 'value')],
     prevent_initial_call=True
 )
-def update_table(n_clicks, orcid_id):
-    if not orcid_id:
-        return dbc.Alert("Please enter a valid ORCID ID.", color="warning"), False, {'display': 'none'}, no_update, True
+def validate_fetch_and_update_ui(n_clicks, orcid_id):
+    if not orcid_id or not re.match(r'^\d{4}-\d{4}-\d{4}-[\dX]{4}$', orcid_id):
+        return (
+            "Missing or Invalid ORCID ID format. Please correct it and try again.",
+            {'display': 'block', 'color': 'warning'},
+            {'display': 'none'},  # Hide spinner
+            no_update,
+            no_update,
+            True,
+            {'display': 'none'},
+            no_update,
+        )
 
-    if not re.match(r'^\d{4}-\d{4}-\d{4}-[\dX]{4}$', orcid_id):
-        return dbc.Alert("Please enter a valid ORCID ID format (e.g., 0000-0002-1825-0097).", color="warning"), False, {'display': 'none'}, no_update, True
-    
-    # ORCID ID is valid, show the spinner while fetching data
-    spinner_style = {'display': 'block'}  # Make the spinner visible
- 
-    df = build_publications_dataframe(orcid_id)
-    if df.empty:
-        return dbc.Alert("No publications found for the provided ORCID ID.", color="warning"), False, {'display': 'none'}, no_update, True
+    # Valid ORCID ID, start fetching data
+    # Show spinner and update message
+    spinner_style = {'display': 'block'}  # Make spinner visible
+    message = "The ORCID number is valid. Fetching publications, please wait..."
+    alert_style = {'display': 'block', 'color': 'primary'}
+
+    try:
+        df = build_publications_dataframe(orcid_id)
+        if df.empty:
+            # Handle empty DataFrame (no publications found)
+            return (
+                "No publications found for the provided ORCID ID.",
+                {'display': 'block', 'color': 'secondary'},
+                {'display': 'none'},  # Hide spinner
+                orcid_id,
+                no_update,
+                True,
+                {'display': 'none'},
+                no_update,
+            )
+
+        # Publications fetched, prepare the data table
+        # table = prepare_data_table(df)  # Assume this is a function that prepares the Dash DataTable
+        tooltip_data = [
+            {column: {'value': str(value), 'type': 'markdown'} for column, value in row.items()}
+            for row in df.to_dict('records')
+        ]
+        table = dbc.Spinner(dash_table.DataTable(
+            id='table-filtering',
+            columns=[{"name": i, "id": i} for i in df.columns],
+            data=df.to_dict('records'),
+            filter_action='native',
+            sort_action='native',
+            sort_mode='multi',
+            page_size=10,
+            style_cell={'overflow': 'hidden', 'textOverflow': 'ellipsis', 'maxWidth': 200},
+            tooltip_data=tooltip_data,
+            tooltip_delay=0,
+            tooltip_duration=None
+        ), size="lg", color="primary", type="border", fullscreen=True)
 
 
-    # Generate tooltip data for each cell
-    tooltip_data = [
-        {column: {'value': str(value), 'type': 'markdown'} for column, value in row.items()}
-        for row in df.to_dict('records')
-    ]
-
-    # spinner_style = {'display': 'block'}  # Make the spinner visible
-    # Create the table with tooltips
-    table = dbc.Spinner(dash_table.DataTable(
-        id='table-filtering',
-        columns=[{"name": i, "id": i} for i in df.columns],
-        data=df.to_dict('records'),
-        filter_action='native',
-        sort_action='native',
-        sort_mode='multi',
-        page_size=10,
-        style_cell={'overflow': 'hidden', 'textOverflow': 'ellipsis', 'maxWidth': 200},
-        tooltip_data=tooltip_data,
-        tooltip_delay=0,
-        tooltip_duration=None
-    ), size="lg", color="primary", type="border", fullscreen=True)
-
-    # Once data fetching and processing are complete, hide the spinner again
-    spinner_style = {'display': 'none'}  # Hide spinner
-
-    # Enable the submit button again after processing
-    return table, False, spinner_style, df.to_dict('records'), False
+        return (
+            "Publications ready. You can now view or download the list.",
+            {'display': 'block', 'color': 'success'},
+            {'display': 'none'},  # Hide spinner after fetching
+            orcid_id,
+            table,
+            False,  # Enable download button
+            {'display': 'block'},  # Show download button
+            df.to_dict('records'),
+        )
+    except Exception as e:
+        # Handle any exceptions during the fetching process
+        return (
+            f"An error occurred: {str(e)}",
+            {'display': 'block', 'color': 'danger'},
+            {'display': 'none'},  # Hide spinner
+            no_update,
+            no_update,
+            True,
+            {'display': 'none'},
+            no_update,
+        )
 
 
 
+
+#####################################################################################################
 # Additional callback for download functionality would go here
-# Example: Download button callback to generate a CSV of the table data
 # Callback to download the data
 @app.callback(
     Output('download-link', 'data'),
@@ -179,8 +343,6 @@ def download_publications_list(n_clicks, stored_data, orcid_id):
     filename = f"{safe_orcid_id}_publications_list.csv"
     # Convert the stored data back to a DataFrame
     df = pd.DataFrame(stored_data)
-    # Once data fetching and processing are complete, hide the spinner again
-    # spinner_style = {'display': 'none'}  # Hide spinner
     # Return the CSV download, dynamically naming the file with the ORCID ID
     return dcc.send_data_frame(df.to_csv, filename, index=False)
 
