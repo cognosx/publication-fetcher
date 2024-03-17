@@ -1,3 +1,5 @@
+# Import required libraries
+from components import Navbar, Footer
 import os 
 import dash
 import pandas as pd
@@ -16,6 +18,9 @@ cache = Cache(app.server, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'cach
 
 # Define the layout of the app
 app.layout = dbc.Container([
+    # Header with logo
+    Navbar(),  # Use the Navbar code snippet from above
+
     dbc.Row(dbc.Col(html.H1('Publications Fetcher'), 
         width={"size": 6, "offset": 3}, 
         className="d-flex justify-content-center")),
@@ -24,7 +29,7 @@ app.layout = dbc.Container([
     dbc.Row(
         dbc.Col([
             dcc.Input(id='orcid-input', type='text', placeholder='e.g., 0000-0002-1825-0097', debounce=True, className="me-2"),
-            html.Button('Submit', id='submit-button', n_clicks=0)
+            html.Button('Submit', id='submit-button', n_clicks=0, style={'backgroundColor': '#ffa500', 'color': 'white', 'border': 'none'})
         ], width=12, className="d-flex justify-content-center"),
         justify="center"  # This centers the row
     ),
@@ -66,7 +71,10 @@ app.layout = dbc.Container([
     dcc.Store(id='stored-data'),
     dcc.Store(id='stored-orcid-id'),  # Add this
 
-    html.Div(id='table-container', className="mt-3")  # Placeholder for table
+    html.Div(id='table-container', className="mt-3"),  # Placeholder for table
+    # Footer
+    Footer(),  # Use the Footer code snippet from above
+
 ], fluid=True, className="py-3")
 
 
