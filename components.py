@@ -39,7 +39,7 @@ def Navbar():
     return dbc.Navbar(
         dbc.Container([
             dbc.Col(html.Img(src='/assets/cognosx_logo.png', height="60px")),
-            dbc.NavbarBrand("Methods", href="#"),
+            #dbc.NavbarBrand("Methods", href="#"),
             dbc.NavbarBrand("Contacts", href="#"),
             # Add more navbar items here
         ]),
