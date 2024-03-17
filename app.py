@@ -145,8 +145,8 @@ def collect_publication_info(doi):
         'Citation count': metadata.get('is-referenced-by-count', 0),
         'Altmetric Score': altmetric_data.get('score'),
         'Altmetric Read Count': altmetric_data.get('readers_count'),
-        'Altmetric Image': altmetric_data.get('images', {}).get('small'),
-        'Altmetric URL': altmetric_data.get('details_url')
+        #'Altmetric Image': altmetric_data.get('images', {}).get('small'),
+        #'Altmetric URL': altmetric_data.get('details_url')
     }
 
 
